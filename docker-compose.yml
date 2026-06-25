@@ -1,0 +1,19 @@
+services:
+  database:
+    image: postgres:18-alpine
+    container_name: sovereignshelf_db
+    restart: always
+    environment:
+      POSTGRES_USER: sovereign
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: sovereignshelf
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    networks:
+      - sovereignshelf_net
+
+networks:
+  sovereignshelf_net:
+    driver: bridge
