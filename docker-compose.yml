@@ -1,19 +1,19 @@
 services:
   database:
     image: postgres:18-alpine
-    container_name: sovereignshelf_db
+    container_name: librearchive_db
     restart: always
     environment:
-      POSTGRES_USER: sovereign
+      POSTGRES_USER: libreuser
       POSTGRES_PASSWORD: 1234
-      POSTGRES_DB: sovereignshelf
+      POSTGRES_DB: librearchive
     ports:
       - "5432:5432"
     volumes:
       - ./data/db:/var/lib/postgresql/data
     networks:
-      - sovereignshelf_net
+      - librearchive_net
 
 networks:
-  sovereignshelf_net:
+  librearchive_net:
     driver: bridge
