@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/zherri/librearchive/database"
 )
 
 func main() {
@@ -12,8 +13,10 @@ func main() {
 
 	r.Use(middleware.Logger)
 
+	db := database.Connect()
+
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("welcome"))
+		w.Write([]byte("Welcome"))
 	})
 
 	http.ListenAndServe(":3000", r)
