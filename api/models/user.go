@@ -10,7 +10,7 @@ type User struct {
 	Password         string    `gorm:"type:varchar(255);not null" json:"-"`
 	RegistrationDate time.Time `gorm:"type:timestamptz;autoCreateTime" json:"registration_date"`
 
-	BookProgressions []BookProgress `gorm:"foreignKey:UserID" json:"progressions,omitempty"`
-	Annotations      []Annotation   `gorm:"foreignKey:UserID" json:"annotations,omitempty"`
-	Collections      []Collection   `gorm:"foreignKey:UserID" json:"collections,omitempty"`
+	BookProgressions []BookProgress `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"progressions,omitempty"`
+	Annotations      []Annotation   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"annotations,omitempty"`
+	Collections      []Collection   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"collections,omitempty"`
 }

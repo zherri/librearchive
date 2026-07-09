@@ -1,4 +1,4 @@
-package database
+package infra
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func Connect() *gorm.DB {
+func ConnectAndMigrate() *gorm.DB {
 	time.Local = time.UTC
 
 	dsn := fmt.Sprintf(
@@ -25,19 +25,19 @@ func Connect() *gorm.DB {
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Falha crítica ao conectar ao banco de dados: %v", err)
+		log.Fatalf("Error connecting to database: %v", err)
 	}
 
 	err = db.AutoMigrate(
-		&models.Annotation{},
-		&models.BookProgress{},
+		&models.User{},
+		&models.Book{},
 		&models.Collection{},
 		&models.CollectionBook{},
-		&models.Book{},
-		&models.User{},
+		&models.BookProgress{},
+		&models.Annotation{},
 	)
 	if err != nil {
-		log.Fatalf("Falha crítica ao executar o AutoMigrate do GORM: %v", err)
+		log.Fatalf("Error migrating entities: %v", err)
 	}
 
 	return db
