@@ -9,7 +9,6 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/zherri/librearchive/handlers"
 	"github.com/zherri/librearchive/infra"
-	"github.com/zherri/librearchive/middlewares"
 )
 
 func main() {
@@ -23,19 +22,31 @@ func main() {
 
 	db := infra.ConnectAndMigrate()
 
+	if err := infra.CreateAdminUser(db); err != nil {
+		log.Fatalf("Failed to create admin user: %v", err)
+	}
+
 	authHandler := handlers.NewAuthHandler(db)
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Welcome"))
+	// "/": AdminLoginPage
+
+	r.Group(func(r chi.Router) {
+		r.Use(infra.AuthMiddleware)
+		r.Use(infra.AdminOnly)
+
+		// "/register": RegisterPage
+		// "/upload": UploadPage
 	})
 
 	r.Route("/api", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
 
 		r.Group(func(r chi.Router) {
-			r.Use(middlewares.AdminOnly)
+			r.Use(infra.AuthMiddleware)
+			r.Use(infra.AdminOnly)
 
 			r.Post("/auth/register", authHandler.Register)
+			// "/upload": Upload
 		})
 	})
 

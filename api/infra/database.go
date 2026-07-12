@@ -42,3 +42,7 @@ func ConnectAndMigrate() *gorm.DB {
 
 	return db
 }
+
+func CreateAdminUser(db *gorm.DB) error {
+	return nil
+}
