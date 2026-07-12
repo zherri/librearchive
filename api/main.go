@@ -22,9 +22,7 @@ func main() {
 
 	db := infra.ConnectAndMigrate()
 
-	if err := infra.CreateAdminUser(db); err != nil {
-		log.Fatalf("Failed to create admin user: %v", err)
-	}
+	infra.CreateAdminUser(db)
 
 	authHandler := handlers.NewAuthHandler(db)
 
