@@ -15,19 +15,11 @@ const (
 
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
+		tokenString, ok := extractToken(r)
+		if !ok {
 			http.Error(w, "forbidden access", http.StatusUnauthorized)
 			return
 		}
-
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			http.Error(w, "forbidden access", http.StatusUnauthorized)
-			return
-		}
-
-		tokenString := parts[1]
 
 		claims, err := DecodeToken(tokenString)
 		if err != nil {
@@ -51,4 +43,21 @@ func AdminOnly(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func extractToken(r *http.Request) (string, bool) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		parts := strings.Split(authHeader, " ")
+		if len(parts) == 2 && parts[0] == "Bearer" && parts[1] != "" {
+			return parts[1], true
+		}
+	}
+
+	cookie, err := r.Cookie("auth_token")
+	if err == nil && cookie.Value != "" {
+		return cookie.Value, true
+	}
+
+	return "", false
 }

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"embed"
+	"io/fs"
 	"log"
 	"net/http"
 
@@ -9,7 +11,11 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/zherri/librearchive/handlers"
 	"github.com/zherri/librearchive/infra"
+	"github.com/zherri/librearchive/utils"
 )
+
+//go:embed web/*.html
+var webPages embed.FS
 
 func main() {
 	r := chi.NewRouter()
@@ -25,14 +31,18 @@ func main() {
 	infra.CreateAdminUser(db)
 
 	authHandler := handlers.NewAuthHandler(db)
+	pagesFS, err := fs.Sub(webPages, "web")
+	if err != nil {
+		log.Fatalf("Failed to load web pages: %v", err)
+	}
 
-	// "/": AdminLoginPage
+	r.Get("/", utils.ServeEmbeddedHTML(pagesFS, "index.html"))
 
 	r.Group(func(r chi.Router) {
 		r.Use(infra.AuthMiddleware)
 		r.Use(infra.AdminOnly)
 
-		// "/register": RegisterPage
+		r.Get("/register", utils.ServeEmbeddedHTML(pagesFS, "register.html"))
 		// "/upload": UploadPage
 	})
 
