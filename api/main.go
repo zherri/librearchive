@@ -31,6 +31,7 @@ func main() {
 	infra.CreateAdminUser(db)
 
 	authHandler := handlers.NewAuthHandler(db)
+	panelHandler := handlers.NewPanelHandler(db)
 	pagesFS, err := fs.Sub(webPages, "web")
 	if err != nil {
 		log.Fatalf("Failed to load web pages: %v", err)
@@ -42,8 +43,7 @@ func main() {
 		r.Use(infra.AuthMiddleware)
 		r.Use(infra.AdminOnly)
 
-		r.Get("/register", utils.ServeEmbeddedHTML(pagesFS, "register.html"))
-		// "/upload": UploadPage
+		r.Get("/panel", utils.ServeEmbeddedHTML(pagesFS, "panel.html"))
 	})
 
 	r.Route("/api", func(r chi.Router) {
@@ -52,6 +52,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(infra.AuthMiddleware)
 			r.Use(infra.AdminOnly)
+			r.Get("/panel/overview", panelHandler.Overview)
 
 			r.Post("/auth/register", authHandler.Register)
 			// "/upload": Upload

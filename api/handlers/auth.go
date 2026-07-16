@@ -13,12 +13,12 @@ import (
 )
 
 type authHandler struct {
-	udbr repositories.IDBRepository[models.User]
+	ur repositories.IDBRepository[models.User]
 }
 
 func NewAuthHandler(db *gorm.DB) *authHandler {
 	return &authHandler{
-		udbr: repositories.NewDBRepository[models.User](db),
+		ur: repositories.NewDBRepository[models.User](db),
 	}
 }
 
@@ -40,7 +40,7 @@ func (ah *authHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := ah.udbr.Find(ctx, "username = ?", dto.Username)
+	users, err := ah.ur.Find(ctx, "username = ?", dto.Username)
 	if err != nil {
 		http.Error(w, "error searching existent user", http.StatusInternalServerError)
 		log.Printf("Error searching existent user: %v", err)
@@ -71,7 +71,7 @@ func (ah *authHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Passphrase: string(hashed),
 	}
 
-	if err := ah.udbr.Create(ctx, &newUser); err != nil {
+	if err := ah.ur.Create(ctx, &newUser); err != nil {
 		http.Error(w, "error creating new user", http.StatusInternalServerError)
 		log.Printf("Error creating new user: %v", err)
 		return
@@ -102,7 +102,7 @@ func (ah *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := ah.udbr.FindWithAssociations(
+	users, err := ah.ur.FindWithAssociations(
 		r.Context(),
 		"username = ?",
 		[]string{"BookProgressions", "Annotations", "Collections"},

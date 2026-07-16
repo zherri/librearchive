@@ -9,10 +9,11 @@ import (
 type IDBRepository[T any] interface {
 	Create(ctx context.Context, entity *T) error
 	FindByID(ctx context.Context, id uint) (*T, error)
-	FindAll(ctx context.Context) ([]T, error)
+	GetAll(ctx context.Context) ([]T, error)
 	FindByIDWithAssociations(ctx context.Context, id uint, associations ...string) (*T, error)
 	FindWithAssociations(ctx context.Context, query string, associations []string, args ...any) ([]T, error)
 	Find(ctx context.Context, query string, args ...any) ([]T, error)
+	Count(ctx context.Context) (int64, error)
 	Save(ctx context.Context, entity *T) error
 	Delete(ctx context.Context, id uint) error
 }
@@ -31,7 +32,7 @@ func (dbr *dbRepository[T]) Create(ctx context.Context, entity *T) error {
 	return dbr.db.WithContext(ctx).Create(entity).Error
 }
 
-func (dbr *dbRepository[T]) FindAll(ctx context.Context) ([]T, error) {
+func (dbr *dbRepository[T]) GetAll(ctx context.Context) ([]T, error) {
 	var entities []T
 	err := dbr.db.WithContext(ctx).Find(&entities).Error
 	if err != nil {
@@ -90,6 +91,15 @@ func (dbr *dbRepository[T]) FindWithAssociations(ctx context.Context, query stri
 		return nil, err
 	}
 	return entities, nil
+}
+
+func (dbr *dbRepository[T]) Count(ctx context.Context) (int64, error) {
+	var count int64
+	err := dbr.db.WithContext(ctx).Model(new(T)).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func (dbr *dbRepository[T]) Save(ctx context.Context, entity *T) error {
