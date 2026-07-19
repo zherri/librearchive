@@ -24,29 +24,29 @@ func main() {
 
 	infra.CreateAdminUser(db)
 
-	authHandler := handlers.NewAuthHandler(db)
-	bookHandler := handlers.NewBookHandler(db)
-	panelHandler := handlers.NewPanelHandler(db)
+	ah := handlers.NewAuthHandler(db)
+	bh := handlers.NewBookHandler(db)
+	ph := handlers.NewPanelHandler(db)
 
 	r.Route("/api", func(r chi.Router) {
-		r.Post("/auth/login", authHandler.Login)
+		r.Post("/auth/login", ah.Login)
 
 		r.Group(func(r chi.Router) {
 			r.Use(infra.AuthMiddleware)
 			r.Use(infra.AdminOnly)
 
-			r.Get("/panel/overview", panelHandler.Overview)
-			r.Post("/auth/register", authHandler.Register)
-			r.Post("/book/upload", bookHandler.Upload)
+			r.Get("/panel/overview", ph.Overview)
+			r.Post("/auth/register", ah.Register)
+			r.Post("/book/upload", bh.Upload)
+			r.Patch("/book/update/{id}", bh.Update)
+			r.Delete("/book/delete/{id}", bh.Delete)
 		})
 
 		r.Group(func(r chi.Router) {
 			r.Use(infra.AuthMiddleware)
 
-			r.Get("/book/get", bookHandler.Get)
-			r.Get("/book/get/{id}", bookHandler.GetByID)
-			r.Patch("/book/update/{id}", bookHandler.Update)
-			r.Delete("/book/delete/{id}", bookHandler.Delete)
+			r.Get("/book/get", bh.Get)
+			r.Get("/book/get/{id}", bh.GetByID)
 		})
 	})
 
