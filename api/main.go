@@ -37,7 +37,16 @@ func main() {
 
 			r.Get("/panel/overview", panelHandler.Overview)
 			r.Post("/auth/register", authHandler.Register)
-			// "/book/upload": Upload
+			r.Post("/book/upload", bookHandler.Upload)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(infra.AuthMiddleware)
+
+			r.Get("/book/get", bookHandler.Get)
+			r.Get("/book/get/{id}", bookHandler.GetByID)
+			r.Patch("/book/update/{id}", bookHandler.Update)
+			r.Delete("/book/delete/{id}", bookHandler.Delete)
 		})
 	})
 
