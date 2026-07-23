@@ -105,7 +105,7 @@ func (ah *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 	users, err := ah.ur.FindWithAssociations(
 		r.Context(),
 		"username = ?",
-		[]string{"BookProgressions", "Annotations", "Collections"},
+		[]string{"BooksProgressions", "Annotations", "Collections"},
 		dto.Username,
 	)
 	if err != nil {

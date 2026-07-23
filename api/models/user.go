@@ -11,7 +11,7 @@ type User struct {
 	IsAdmin          bool      `gorm:"default:false" json:"is_admin"`
 	RegistrationDate time.Time `gorm:"type:timestamptz;autoCreateTime" json:"registration_date"`
 
-	BookProgressions []BookProgress `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"progressions,omitempty"`
-	Annotations      []Annotation   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"annotations,omitempty"`
-	Collections      []Collection   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"collections,omitempty"`
+	BooksProgressions []BookProgress `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"books_progressions,omitempty"`
+	Annotations       []Annotation   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"annotations,omitempty"`
+	Collections       []Collection   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"collections,omitempty"`
 }

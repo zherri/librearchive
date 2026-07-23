@@ -28,32 +28,32 @@ func NewDBRepository[T any](db *gorm.DB) IDBRepository[T] {
 	}
 }
 
-func (dbr *dbRepository[T]) Create(ctx context.Context, entity *T) error {
-	return dbr.db.WithContext(ctx).Create(entity).Error
+func (r *dbRepository[T]) Create(ctx context.Context, entity *T) error {
+	return r.db.WithContext(ctx).Create(entity).Error
 }
 
-func (dbr *dbRepository[T]) GetAll(ctx context.Context) ([]T, error) {
+func (r *dbRepository[T]) GetAll(ctx context.Context) ([]T, error) {
 	var entities []T
-	err := dbr.db.WithContext(ctx).Find(&entities).Error
+	err := r.db.WithContext(ctx).Find(&entities).Error
 	if err != nil {
 		return nil, err
 	}
 	return entities, nil
 }
 
-func (dbr *dbRepository[T]) FindByID(ctx context.Context, id uint) (*T, error) {
+func (r *dbRepository[T]) FindByID(ctx context.Context, id uint) (*T, error) {
 	var entity T
-	err := dbr.db.WithContext(ctx).First(&entity, id).Error
+	err := r.db.WithContext(ctx).First(&entity, id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &entity, nil
 }
 
-func (dbr *dbRepository[T]) FindByIDWithAssociations(ctx context.Context, id uint, associations ...string) (*T, error) {
+func (r *dbRepository[T]) FindByIDWithAssociations(ctx context.Context, id uint, associations ...string) (*T, error) {
 	var entity T
 
-	query := dbr.db.WithContext(ctx)
+	query := r.db.WithContext(ctx)
 
 	for _, assoc := range associations {
 		query = query.Preload(assoc)
@@ -66,19 +66,19 @@ func (dbr *dbRepository[T]) FindByIDWithAssociations(ctx context.Context, id uin
 	return &entity, nil
 }
 
-func (dbr *dbRepository[T]) Find(ctx context.Context, query string, args ...any) ([]T, error) {
+func (r *dbRepository[T]) Find(ctx context.Context, query string, args ...any) ([]T, error) {
 	var entities []T
-	err := dbr.db.WithContext(ctx).Where(query, args...).Find(&entities).Error
+	err := r.db.WithContext(ctx).Where(query, args...).Find(&entities).Error
 	if err != nil {
 		return nil, err
 	}
 	return entities, nil
 }
 
-func (dbr *dbRepository[T]) FindWithAssociations(ctx context.Context, query string, associations []string, args ...any) ([]T, error) {
+func (r *dbRepository[T]) FindWithAssociations(ctx context.Context, query string, associations []string, args ...any) ([]T, error) {
 	var entities []T
 
-	dbQuery := dbr.db.WithContext(ctx)
+	dbQuery := r.db.WithContext(ctx)
 
 	for _, assoc := range associations {
 		dbQuery = dbQuery.Preload(assoc)
@@ -93,20 +93,20 @@ func (dbr *dbRepository[T]) FindWithAssociations(ctx context.Context, query stri
 	return entities, nil
 }
 
-func (dbr *dbRepository[T]) Count(ctx context.Context) (int64, error) {
+func (r *dbRepository[T]) Count(ctx context.Context) (int64, error) {
 	var count int64
-	err := dbr.db.WithContext(ctx).Model(new(T)).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(new(T)).Count(&count).Error
 	if err != nil {
 		return 0, err
 	}
 	return count, nil
 }
 
-func (dbr *dbRepository[T]) Save(ctx context.Context, entity *T) error {
-	return dbr.db.WithContext(ctx).Save(entity).Error
+func (r *dbRepository[T]) Save(ctx context.Context, entity *T) error {
+	return r.db.WithContext(ctx).Save(entity).Error
 }
 
-func (dbr *dbRepository[T]) Delete(ctx context.Context, id uint) error {
+func (r *dbRepository[T]) Delete(ctx context.Context, id uint) error {
 	var entity T
-	return dbr.db.WithContext(ctx).Delete(&entity, id).Error
+	return r.db.WithContext(ctx).Delete(&entity, id).Error
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/zherri/librearchive/handlers"
 	"github.com/zherri/librearchive/infra"
+	"github.com/zherri/librearchive/repositories"
 )
 
 func main() {
@@ -21,11 +22,15 @@ func main() {
 	}
 
 	db := infra.ConnectAndMigrate()
+	lsr, err := repositories.NewLocalStorageRepository()
+	if err != nil {
+		log.Fatalf("Failed to create data folder: %v", err)
+	}
 
 	infra.CreateAdminUser(db)
 
 	ah := handlers.NewAuthHandler(db)
-	bh := handlers.NewBookHandler(db)
+	bh := handlers.NewBookHandler(db, lsr)
 	ph := handlers.NewPanelHandler(db)
 
 	r.Route("/api", func(r chi.Router) {
