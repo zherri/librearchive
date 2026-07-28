@@ -31,40 +31,35 @@ func (bh *bookHandler) Get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	query := r.URL.Query()
 
-	var books []models.Book
-	var err error
+	page, err := strconv.Atoi(query.Get("page"))
+	if err != nil {
+		http.Error(w, "invalid parameters", http.StatusBadRequest)
+		return
+	}
+	limit, err := strconv.Atoi(query.Get("limit"))
+	if err != nil {
+		http.Error(w, "invalid parameters", http.StatusBadRequest)
+		return
+	}
+	search := strings.TrimSpace(query.Get("search"))
 
-	if _, ok := query["search"]; !ok {
-		books, err = bh.br.GetAll(ctx)
-		if err != nil {
-			http.Error(w, "error trying to get books", http.StatusInternalServerError)
-			log.Printf("Error trying to get books: %v", err)
-			return
-		}
-	} else {
-		search := query.Get("search")
-		if search == "" {
-			http.Error(w, "invalid request", http.StatusBadRequest)
-			return
-		}
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
 
-		search = "%" + search + "%"
-
-		sqlQuery := "title LIKE ? OR authors LIKE ? OR genre LIKE ? OR publisher LIKE ?"
-
-		books, err = bh.br.Find(ctx, sqlQuery, search, search, search, search)
-		if err != nil {
-			http.Error(w, "error trying to get books", http.StatusInternalServerError)
-			log.Printf("Error trying to get books: %v", err)
-			return
-		}
+	response, err := bh.br.GetPaginated(ctx, page, limit, search)
+	if err != nil {
+		http.Error(w, "error trying to get books", http.StatusInternalServerError)
+		log.Printf("Error trying to get books: %v", err)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]any{
-		"books": books,
-	})
+	json.NewEncoder(w).Encode(response)
 }
 
 func (bh *bookHandler) GetByID(w http.ResponseWriter, r *http.Request) {

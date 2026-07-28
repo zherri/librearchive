@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"math"
 
 	"gorm.io/gorm"
 )
@@ -10,6 +11,7 @@ type IDBRepository[T any] interface {
 	Create(ctx context.Context, entity *T) error
 	FindByID(ctx context.Context, id uint) (*T, error)
 	GetAll(ctx context.Context) ([]T, error)
+	GetPaginated(ctx context.Context, page, limit int, search string) (*PaginatedResponse[T], error)
 	FindByIDWithAssociations(ctx context.Context, id uint, associations ...string) (*T, error)
 	FindWithAssociations(ctx context.Context, query string, associations []string, args ...any) ([]T, error)
 	Find(ctx context.Context, query string, args ...any) ([]T, error)
@@ -39,6 +41,49 @@ func (r *dbRepository[T]) GetAll(ctx context.Context) ([]T, error) {
 		return nil, err
 	}
 	return entities, nil
+}
+
+type PaginatedResponse[T any] struct {
+	Data       []T   `json:"data"`
+	Page       int   `json:"page"`
+	Limit      int   `json:"limit"`
+	TotalItems int64 `json:"total_items"`
+	TotalPages int   `json:"total_pages"`
+}
+
+func (r *dbRepository[T]) GetPaginated(ctx context.Context, page, limit int, search string) (*PaginatedResponse[T], error) {
+	var items []T
+	var totalItems int64
+
+	dbQuery := r.db.WithContext(ctx).Model(new(T))
+
+	if search != "" {
+		searchTerm := "%" + search + "%"
+		dbQuery = dbQuery.Where(
+			"title ILIKE ? OR authors ILIKE ? OR genre ILIKE ? OR publisher ILIKE ?",
+			searchTerm, searchTerm, searchTerm, searchTerm,
+		)
+	}
+
+	if err := dbQuery.Count(&totalItems).Error; err != nil {
+		return nil, err
+	}
+
+	offset := (page - 1) * limit
+
+	if err := dbQuery.Limit(limit).Offset(offset).Find(&items).Error; err != nil {
+		return nil, err
+	}
+
+	totalPages := int(math.Ceil(float64(totalItems) / float64(limit)))
+
+	return &PaginatedResponse[T]{
+		Data:       items,
+		Page:       page,
+		Limit:      limit,
+		TotalItems: totalItems,
+		TotalPages: totalPages,
+	}, nil
 }
 
 func (r *dbRepository[T]) FindByID(ctx context.Context, id uint) (*T, error) {
