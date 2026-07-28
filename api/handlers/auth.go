@@ -102,12 +102,7 @@ func (ah *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := ah.ur.FindWithAssociations(
-		r.Context(),
-		"username = ?",
-		[]string{"BooksProgressions", "Annotations", "Collections"},
-		dto.Username,
-	)
+	users, err := ah.ur.Find(r.Context(), "username = ?", dto.Username)
 	if err != nil {
 		http.Error(w, "error finding user", http.StatusInternalServerError)
 		log.Printf("Error finding user: %v", err)

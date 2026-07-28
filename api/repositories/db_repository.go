@@ -9,12 +9,12 @@ import (
 
 type IDBRepository[T any] interface {
 	Create(ctx context.Context, entity *T) error
-	FindByID(ctx context.Context, id uint) (*T, error)
 	GetAll(ctx context.Context) ([]T, error)
 	GetPaginated(ctx context.Context, page, limit int, search string) (*PaginatedResponse[T], error)
+	FindByID(ctx context.Context, id uint) (*T, error)
 	FindByIDWithAssociations(ctx context.Context, id uint, associations ...string) (*T, error)
-	FindWithAssociations(ctx context.Context, query string, associations []string, args ...any) ([]T, error)
 	Find(ctx context.Context, query string, args ...any) ([]T, error)
+	FindWithAssociations(ctx context.Context, query string, associations []string, args ...any) ([]T, error)
 	Count(ctx context.Context) (int64, error)
 	Save(ctx context.Context, entity *T) error
 	Delete(ctx context.Context, id uint) error
