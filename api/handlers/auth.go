@@ -26,7 +26,7 @@ type registerDTO struct {
 	Username string `json:"username"`
 }
 
-func (ah *authHandler) Register(w http.ResponseWriter, r *http.Request) {
+func (h *authHandler) Register(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var dto registerDTO
@@ -40,7 +40,7 @@ func (ah *authHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := ah.ur.Find(ctx, "username = ?", dto.Username)
+	users, err := h.ur.Find(ctx, "username = ?", dto.Username)
 	if err != nil {
 		http.Error(w, "error searching existent user", http.StatusInternalServerError)
 		log.Printf("Error searching existent user: %v", err)
@@ -71,7 +71,7 @@ func (ah *authHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Passphrase: string(hashed),
 	}
 
-	if err := ah.ur.Create(ctx, &newUser); err != nil {
+	if err := h.ur.Create(ctx, &newUser); err != nil {
 		http.Error(w, "error creating new user", http.StatusInternalServerError)
 		log.Printf("Error creating new user: %v", err)
 		return
@@ -90,7 +90,7 @@ type loginDTO struct {
 	Passphrase string `json:"passphrase"`
 }
 
-func (ah *authHandler) Login(w http.ResponseWriter, r *http.Request) {
+func (h *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var dto loginDTO
 	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -102,7 +102,7 @@ func (ah *authHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := ah.ur.Find(r.Context(), "username = ?", dto.Username)
+	users, err := h.ur.Find(r.Context(), "username = ?", dto.Username)
 	if err != nil {
 		http.Error(w, "error finding user", http.StatusInternalServerError)
 		log.Printf("Error finding user: %v", err)

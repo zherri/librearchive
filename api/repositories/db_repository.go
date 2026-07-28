@@ -11,10 +11,11 @@ type IDBRepository[T any] interface {
 	Create(ctx context.Context, entity *T) error
 	GetAll(ctx context.Context) ([]T, error)
 	GetPaginated(ctx context.Context, page, limit int, search string) (*PaginatedResponse[T], error)
+	GetPaginatedWithAssoc(ctx context.Context, page, limit int, search string, associations ...string) (*PaginatedResponse[T], error)
 	FindByID(ctx context.Context, id uint) (*T, error)
-	FindByIDWithAssociations(ctx context.Context, id uint, associations ...string) (*T, error)
+	FindByIDWithAssoc(ctx context.Context, id uint, associations ...string) (*T, error)
 	Find(ctx context.Context, query string, args ...any) ([]T, error)
-	FindWithAssociations(ctx context.Context, query string, associations []string, args ...any) ([]T, error)
+	FindWithAssoc(ctx context.Context, associations []string, query string, args ...any) ([]T, error)
 	Count(ctx context.Context) (int64, error)
 	Save(ctx context.Context, entity *T) error
 	Delete(ctx context.Context, id uint) error
@@ -86,6 +87,45 @@ func (r *dbRepository[T]) GetPaginated(ctx context.Context, page, limit int, sea
 	}, nil
 }
 
+func (r *dbRepository[T]) GetPaginatedWithAssoc(ctx context.Context, page, limit int, search string, associations ...string) (*PaginatedResponse[T], error) {
+	var items []T
+	var totalItems int64
+
+	dbQuery := r.db.WithContext(ctx).Model(new(T))
+
+	if search != "" {
+		searchTerm := "%" + search + "%"
+		dbQuery = dbQuery.Where(
+			"title ILIKE ? OR authors ILIKE ? OR genre ILIKE ? OR publisher ILIKE ?",
+			searchTerm, searchTerm, searchTerm, searchTerm,
+		)
+	}
+
+	if err := dbQuery.Count(&totalItems).Error; err != nil {
+		return nil, err
+	}
+
+	for _, assoc := range associations {
+		dbQuery = dbQuery.Preload(assoc)
+	}
+
+	offset := (page - 1) * limit
+
+	if err := dbQuery.Limit(limit).Offset(offset).Find(&items).Error; err != nil {
+		return nil, err
+	}
+
+	totalPages := int(math.Ceil(float64(totalItems) / float64(limit)))
+
+	return &PaginatedResponse[T]{
+		Data:       items,
+		Page:       page,
+		Limit:      limit,
+		TotalItems: totalItems,
+		TotalPages: totalPages,
+	}, nil
+}
+
 func (r *dbRepository[T]) FindByID(ctx context.Context, id uint) (*T, error) {
 	var entity T
 	err := r.db.WithContext(ctx).First(&entity, id).Error
@@ -95,7 +135,7 @@ func (r *dbRepository[T]) FindByID(ctx context.Context, id uint) (*T, error) {
 	return &entity, nil
 }
 
-func (r *dbRepository[T]) FindByIDWithAssociations(ctx context.Context, id uint, associations ...string) (*T, error) {
+func (r *dbRepository[T]) FindByIDWithAssoc(ctx context.Context, id uint, associations ...string) (*T, error) {
 	var entity T
 
 	query := r.db.WithContext(ctx)
@@ -120,7 +160,7 @@ func (r *dbRepository[T]) Find(ctx context.Context, query string, args ...any) (
 	return entities, nil
 }
 
-func (r *dbRepository[T]) FindWithAssociations(ctx context.Context, query string, associations []string, args ...any) ([]T, error) {
+func (r *dbRepository[T]) FindWithAssoc(ctx context.Context, associations []string, query string, args ...any) ([]T, error) {
 	var entities []T
 
 	dbQuery := r.db.WithContext(ctx)

@@ -1,8 +1,6 @@
 package models
 
-import (
-	"time"
-)
+import "time"
 
 type User struct {
 	ID               uint      `gorm:"primaryKey" json:"user_id"`
@@ -11,7 +9,7 @@ type User struct {
 	IsAdmin          bool      `gorm:"default:false" json:"is_admin"`
 	RegistrationDate time.Time `gorm:"type:timestamptz;autoCreateTime" json:"registration_date"`
 
-	BooksProgressions []BookProgress `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"books_progressions,omitempty"`
-	Annotations       []Annotation   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"annotations,omitempty"`
-	Collections       []Collection   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"collections,omitempty"`
+	Progressions []Progress   `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"progressions,omitempty"`
+	Annotations  []Annotation `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"annotations,omitempty"`
+	Collections  []Collection `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"collections,omitempty"`
 }

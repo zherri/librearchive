@@ -31,7 +31,8 @@ func main() {
 
 	ah := handlers.NewAuthHandler(db)
 	bh := handlers.NewBookHandler(db, lsr)
-	ph := handlers.NewPanelHandler(db)
+	ph := handlers.NewProgressHandler(db)
+	pnlh := handlers.NewPanelHandler(db)
 
 	r.Route("/api", func(r chi.Router) {
 		r.Post("/auth/login", ah.Login)
@@ -40,7 +41,7 @@ func main() {
 			r.Use(infra.AuthMiddleware)
 			r.Use(infra.AdminOnly)
 
-			r.Get("/panel/overview", ph.Overview)
+			r.Get("/panel/overview", pnlh.Overview)
 			r.Post("/auth/register", ah.Register)
 			r.Post("/book/upload", bh.Upload)
 			r.Patch("/book/update/{id}", bh.Update)
@@ -50,8 +51,15 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(infra.AuthMiddleware)
 
-			r.Get("/book/get", bh.Get)
-			r.Get("/book/get/{id}", bh.GetByID)
+			r.Route("/book", func(r chi.Router) {
+				r.Get("/get", bh.Get)
+				r.Get("/get/{id}", bh.GetByID)
+
+				r.Route("/progress", func(r chi.Router) {
+					r.Get("/get", ph.Get)
+					r.Get("/get/{id}", ph.GetByID)
+				})
+			})
 		})
 	})
 

@@ -21,22 +21,22 @@ func NewPanelHandler(db *gorm.DB) *panelHandler {
 	}
 }
 
-func (ph *panelHandler) Overview(w http.ResponseWriter, r *http.Request) {
+func (h *panelHandler) Overview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	usersCount, err := ph.ur.Count(ctx)
+	usersCount, err := h.ur.Count(ctx)
 	if err != nil {
 		http.Error(w, "error loading users count", http.StatusInternalServerError)
 		return
 	}
 
-	booksCount, err := ph.br.Count(ctx)
+	booksCount, err := h.br.Count(ctx)
 	if err != nil {
 		http.Error(w, "error loading books count", http.StatusInternalServerError)
 		return
 	}
 
-	users, err := ph.ur.GetAll(ctx)
+	users, err := h.ur.GetAll(ctx)
 	if err != nil {
 		http.Error(w, "error loading users", http.StatusInternalServerError)
 		return

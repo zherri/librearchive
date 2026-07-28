@@ -34,7 +34,7 @@ func ConnectAndMigrate() *gorm.DB {
 		&models.Book{},
 		&models.Collection{},
 		&models.CollectionBook{},
-		&models.BookProgress{},
+		&models.Progress{},
 		&models.Annotation{},
 	)
 	if err != nil {

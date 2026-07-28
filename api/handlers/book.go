@@ -27,7 +27,7 @@ func NewBookHandler(db *gorm.DB, lsr repositories.ILocalStorageRepository) *book
 	}
 }
 
-func (bh *bookHandler) Get(w http.ResponseWriter, r *http.Request) {
+func (h *bookHandler) Get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	query := r.URL.Query()
 
@@ -50,7 +50,7 @@ func (bh *bookHandler) Get(w http.ResponseWriter, r *http.Request) {
 		limit = 20
 	}
 
-	response, err := bh.br.GetPaginated(ctx, page, limit, search)
+	response, err := h.br.GetPaginated(ctx, page, limit, search)
 	if err != nil {
 		http.Error(w, "error trying to get books", http.StatusInternalServerError)
 		log.Printf("Error trying to get books: %v", err)
@@ -62,7 +62,7 @@ func (bh *bookHandler) Get(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func (bh *bookHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+func (h *bookHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 
 	id, err := strconv.ParseUint(idStr, 10, 0)
@@ -71,7 +71,7 @@ func (bh *bookHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	book, err := bh.br.FindByID(r.Context(), uint(id))
+	book, err := h.br.FindByID(r.Context(), uint(id))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "book not found", http.StatusNotFound)
@@ -89,7 +89,7 @@ func (bh *bookHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (bh *bookHandler) Upload(w http.ResponseWriter, r *http.Request) {
+func (h *bookHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseMultipartForm(100 << 20)
 	if err != nil {
 		http.Error(w, "failed to parse multipart form", http.StatusBadRequest)
@@ -122,7 +122,7 @@ func (bh *bookHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bookFilename, coverFilename, err := bh.lsr.AddBook(bookFileHeader.Filename, bookFile, coverFileHeader.Filename, coverFile)
+	bookFilename, coverFilename, err := h.lsr.AddBook(bookFileHeader.Filename, bookFile, coverFileHeader.Filename, coverFile)
 	if err != nil {
 		http.Error(w, "failed to save book", http.StatusInternalServerError)
 		log.Printf("Failed to save book: %v", err)
@@ -145,7 +145,7 @@ func (bh *bookHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		CoverName:       coverFilename,
 	}
 
-	if err := bh.br.Create(r.Context(), &book); err != nil {
+	if err := h.br.Create(r.Context(), &book); err != nil {
 		http.Error(w, "error creating new book", http.StatusInternalServerError)
 		log.Printf("Error creating new book: %v", err)
 		return
@@ -162,7 +162,7 @@ type UpdateBookDTO struct {
 	PublicationDate *string `json:"publication_date"`
 }
 
-func (bh *bookHandler) Update(w http.ResponseWriter, r *http.Request) {
+func (h *bookHandler) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	idStr := chi.URLParam(r, "id")
@@ -179,7 +179,7 @@ func (bh *bookHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	book, err := bh.br.FindByID(ctx, uint(id))
+	book, err := h.br.FindByID(ctx, uint(id))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "book not found", http.StatusNotFound)
@@ -206,7 +206,7 @@ func (bh *bookHandler) Update(w http.ResponseWriter, r *http.Request) {
 		book.PublicationDate = *dto.PublicationDate
 	}
 
-	if err := bh.br.Save(ctx, book); err != nil {
+	if err := h.br.Save(ctx, book); err != nil {
 		http.Error(w, "error trying to save book", http.StatusInternalServerError)
 		log.Printf("Error trying to save book: %v", err)
 		return
@@ -219,7 +219,7 @@ func (bh *bookHandler) Update(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (bh *bookHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *bookHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	idStr := chi.URLParam(r, "id")
@@ -230,7 +230,7 @@ func (bh *bookHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	book, err := bh.br.FindByID(ctx, uint(id))
+	book, err := h.br.FindByID(ctx, uint(id))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "book not found", http.StatusNotFound)
@@ -241,13 +241,13 @@ func (bh *bookHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := bh.lsr.RemoveBook(book.Filename, book.CoverName); err != nil {
+	if err := h.lsr.RemoveBook(book.Filename, book.CoverName); err != nil {
 		http.Error(w, "failed to remove book", http.StatusInternalServerError)
 		log.Printf("Failed to remove book: %v", err)
 		return
 	}
 
-	if err := bh.br.Delete(ctx, uint(id)); err != nil {
+	if err := h.br.Delete(ctx, uint(id)); err != nil {
 		http.Error(w, "error trying to delete book", http.StatusInternalServerError)
 		log.Printf("Error trying to delete book: %v", err)
 		return

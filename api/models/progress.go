@@ -2,8 +2,8 @@ package models
 
 import "time"
 
-type BookProgress struct {
-	ID           uint      `gorm:"primaryKey" json:"bookprogress_id"`
+type Progress struct {
+	ID           uint      `gorm:"primaryKey" json:"progress_id"`
 	UserID       uint      `gorm:"not null;" json:"user_id"`
 	BookID       uint      `gorm:"not null;" json:"book_id"`
 	LastCFI      *string   `gorm:"type:varchar(255)" json:"last_cfi,omitempty"`
