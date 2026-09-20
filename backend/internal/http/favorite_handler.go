@@ -11,11 +11,7 @@ import (
 func (s *Server) listFavorites(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	user := currentUser(r)
 	var favorites []models.Favorite
-	if err := s.db.Preload("Book").Where("user_id = ?", user.ID).Order("created_at desc").Find(&favorites).Error; err != nil {
-		internalError(w, err)
-		return
-	}
-	respond(w, 200, favorites)
+	paginated(w, r, s.db.Preload("Book").Where("user_id = ?", user.ID).Order("created_at desc"), &favorites)
 }
 func (s *Server) addFavorite(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	book, ok := s.findBook(w, chi.URLParam(r, "bookID"))

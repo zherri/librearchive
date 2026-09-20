@@ -8,12 +8,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/librearchive/librearchive/internal/bootstrap"
 	"github.com/librearchive/librearchive/internal/config"
 	"github.com/librearchive/librearchive/internal/database"
 	api "github.com/librearchive/librearchive/internal/http"
 )
 
-func TestBootstrapLoginRefreshAndLogout(t *testing.T) {
+func TestInitialAdministratorLoginRefreshAndLogout(t *testing.T) {
 	temporaryDirectory := t.TempDir()
 	cfg := config.Config{DatabasePath: filepath.Join(temporaryDirectory, "library.db"), StoragePath: temporaryDirectory, JWTSecret: "test-secret"}
 	db, err := database.Open(cfg.DatabasePath)
@@ -25,18 +26,12 @@ func TestBootstrapLoginRefreshAndLogout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bootstrap := request(server.Router(), http.MethodPost, "/api/v1/auth/bootstrap", map[string]string{"username": "admin", "name": "Administrator"}, "")
-	if bootstrap.Code != http.StatusCreated {
-		t.Fatalf("bootstrap status = %d, body = %s", bootstrap.Code, bootstrap.Body.String())
-	}
-	var bootstrapBody struct {
-		Passphrase string `json:"passphrase"`
-	}
-	if err := json.NewDecoder(bootstrap.Body).Decode(&bootstrapBody); err != nil {
+	initialAdministrator, err := bootstrap.EnsureInitialAdministrator(db)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	login := request(server.Router(), http.MethodPost, "/api/v1/auth/login", map[string]string{"username": "admin", "passphrase": bootstrapBody.Passphrase}, "")
+	login := request(server.Router(), http.MethodPost, "/api/v1/auth/login", map[string]string{"username": initialAdministrator.Username, "passphrase": initialAdministrator.Passphrase}, "")
 	if login.Code != http.StatusOK {
 		t.Fatalf("login status = %d", login.Code)
 	}

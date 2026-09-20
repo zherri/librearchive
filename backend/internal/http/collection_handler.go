@@ -25,11 +25,7 @@ func (input collectionInput) validate() error {
 }
 func (s *Server) listCollections(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	var collections []models.Collection
-	if err := s.db.Where("user_id = ?", currentUser(r).ID).Order("created_at desc").Find(&collections).Error; err != nil {
-		internalError(w, err)
-		return
-	}
-	respond(w, 200, collections)
+	paginated(w, r, s.db.Where("user_id = ?", currentUser(r).ID).Order("created_at desc"), &collections)
 }
 func (s *Server) createCollection(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	var input collectionInput
@@ -52,12 +48,19 @@ func (s *Server) getCollection(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	if !ok {
 		return
 	}
-	var items []models.CollectionBook
-	if err := s.db.Preload("Book").Where("collection_id = ?", collection.ID).Find(&items).Error; err != nil {
+	offset, limit := pagination(r)
+	query := s.db.Preload("Book").Where("collection_id = ?", collection.ID)
+	var total int64
+	if err := query.Model(&models.CollectionBook{}).Count(&total).Error; err != nil {
 		internalError(w, err)
 		return
 	}
-	respond(w, 200, map[string]interface{}{"collection": collection, "items": items})
+	var items []models.CollectionBook
+	if err := query.Offset(offset).Limit(limit).Find(&items).Error; err != nil {
+		internalError(w, err)
+		return
+	}
+	respond(w, 200, map[string]interface{}{"collection": collection, "items": items, "offset": offset, "limit": limit, "total": total})
 }
 func (s *Server) updateCollection(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	collection, ok := s.findOwnedCollection(w, r)

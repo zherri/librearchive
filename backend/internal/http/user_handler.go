@@ -36,13 +36,9 @@ func (s *Server) createUser(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	}
 	respond(w, 201, map[string]interface{}{"user": user, "passphrase": generatedPassphrase})
 }
-func (s *Server) listUsers(w stdhttp.ResponseWriter, _ *stdhttp.Request) {
+func (s *Server) listUsers(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	var users []models.User
-	if err := s.db.Order("created_at desc").Find(&users).Error; err != nil {
-		internalError(w, err)
-		return
-	}
-	respond(w, 200, users)
+	paginated(w, r, s.db.Order("created_at desc"), &users)
 }
 
 type updateUserInput struct {
@@ -113,6 +109,12 @@ func (s *Server) updateUser(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	if err := s.db.Save(&user).Error; err != nil {
 		internalError(w, err)
 		return
+	}
+	if (input.IsActive != nil && !*input.IsActive) || input.Role != nil {
+		if err := s.db.Where("user_id = ?", user.ID).Delete(&models.AuthSession{}).Error; err != nil {
+			internalError(w, err)
+			return
+		}
 	}
 	respond(w, 200, user)
 }

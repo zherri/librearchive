@@ -24,7 +24,9 @@ The API listens on `:8080` by default. On first run it creates these persistent 
 - `data/storage/books` — uploaded PDFs
 - `data/storage/covers` — uploaded cover images
 
-Create the initial administrator once with `POST /api/v1/auth/bootstrap`, providing `username` and `name`. The response includes an automatically generated twelve-word passphrase; store it securely, because it is not retained in plain text. Subsequent users must be created by an authenticated administrator and receive the same one-time passphrase response.
+On its first start with no administrator in the database, the API creates an active administrator with username `admin` and name `admin`. It prints a generated twelve-word passphrase to the server console once; store it securely, because only its bcrypt hash is persisted. On later starts, no passphrase is printed and no account is recreated. Subsequent users must be created by an authenticated administrator and receive their generated passphrase once.
+
+Access tokens last one day for every role. Refresh tokens are signed JWTs and rotate on use; they last one day for administrators and 365 days for readers. Logging out, resetting a passphrase, deactivating, or deleting an account revokes its active sessions.
 
 ## Configuration
 
@@ -42,7 +44,6 @@ Create the initial administrator once with `POST /api/v1/auth/bootstrap`, provid
 Public endpoints:
 
 - `GET /health`
-- `POST /api/v1/auth/bootstrap`
 - `POST /api/v1/auth/login`
 
 Authenticated endpoints:

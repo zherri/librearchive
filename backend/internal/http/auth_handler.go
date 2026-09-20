@@ -1,11 +1,12 @@
 package http
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	stdhttp "net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,35 +22,6 @@ type loginInput struct {
 	Passphrase string `json:"passphrase"`
 }
 
-func (s *Server) bootstrap(w stdhttp.ResponseWriter, r *stdhttp.Request) {
-	var count int64
-	if err := s.db.Model(&models.User{}).Count(&count).Error; err != nil {
-		internalError(w, err)
-		return
-	}
-	if count != 0 {
-		fail(w, 409, "bootstrap is only available before the first user is created")
-		return
-	}
-	var input createUserInput
-	if !decodeJSON(w, r, &input) {
-		return
-	}
-	if err := input.validate(); err != nil {
-		fail(w, 400, err.Error())
-		return
-	}
-	user, generatedPassphrase, err := newUser(input, models.RoleAdmin)
-	if err != nil {
-		internalError(w, err)
-		return
-	}
-	if err := s.db.Create(&user).Error; err != nil {
-		internalError(w, err)
-		return
-	}
-	respond(w, 201, map[string]interface{}{"user": user, "passphrase": generatedPassphrase})
-}
 func (s *Server) login(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	var input loginInput
 	if !decodeJSON(w, r, &input) {
@@ -81,13 +53,28 @@ func (s *Server) refresh(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		fail(w, 400, "refreshToken is required")
 		return
 	}
+	parsed, err := jwt.ParseWithClaims(input.RefreshToken, &refreshClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(s.config.JWTSecret), nil
+	})
+	if err != nil || !parsed.Valid {
+		fail(w, 401, "invalid or expired refresh token")
+		return
+	}
+	tokenClaims, ok := parsed.Claims.(*refreshClaims)
+	if !ok || tokenClaims.SessionID == 0 {
+		fail(w, 401, "invalid or expired refresh token")
+		return
+	}
 	var session models.AuthSession
-	if err := s.db.Where("refresh_token_hash = ? AND revoked_at IS NULL AND expires_at > ?", hashRefreshToken(input.RefreshToken), time.Now().UTC()).First(&session).Error; err != nil {
+	if err := s.db.Where("id = ? AND refresh_token_hash = ? AND revoked_at IS NULL AND expires_at > ?", tokenClaims.SessionID, hashRefreshToken(input.RefreshToken), time.Now().UTC()).First(&session).Error; err != nil {
 		fail(w, 401, "invalid or expired refresh token")
 		return
 	}
 	var user models.User
-	if err := s.db.First(&user, session.UserID).Error; err != nil || !user.IsActive {
+	if err := s.db.First(&user, session.UserID).Error; err != nil || !user.IsActive || tokenClaims.Subject != strconv.FormatUint(uint64(user.ID), 10) {
 		fail(w, 401, "invalid or inactive user")
 		return
 	}
@@ -123,11 +110,12 @@ func (s *Server) logout(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 }
 
 func (s *Server) issueSession(user models.User) (map[string]interface{}, error) {
-	refreshToken, err := newRefreshToken()
-	if err != nil {
-		return nil, err
+	expiresAt := time.Now().UTC().Add(sessionLifetime(user.Role))
+	session := models.AuthSession{
+		UserID:           user.ID,
+		RefreshTokenHash: hashRefreshToken(fmt.Sprintf("pending:%d:%d", user.ID, time.Now().UnixNano())),
+		ExpiresAt:        expiresAt,
 	}
-	session := models.AuthSession{UserID: user.ID, RefreshTokenHash: hashRefreshToken(refreshToken), ExpiresAt: time.Now().UTC().Add(30 * 24 * time.Hour)}
 	if err := s.db.Create(&session).Error; err != nil {
 		return nil, err
 	}
@@ -135,14 +123,21 @@ func (s *Server) issueSession(user models.User) (map[string]interface{}, error) 
 	if err != nil {
 		return nil, err
 	}
+	refreshToken, err := s.refreshTokenFor(user, session.ID, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.db.Model(&session).Update("refresh_token_hash", hashRefreshToken(refreshToken)).Error; err != nil {
+		return nil, err
+	}
 	return map[string]interface{}{"token": accessToken, "refreshToken": refreshToken, "user": user}, nil
 }
-func newRefreshToken() (string, error) {
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
+
+func sessionLifetime(role models.Role) time.Duration {
+	if role == models.RoleAdmin {
+		return 24 * time.Hour
 	}
-	return hex.EncodeToString(bytes), nil
+	return 365 * 24 * time.Hour
 }
 func hashRefreshToken(token string) string {
 	sum := sha256.Sum256([]byte(token))

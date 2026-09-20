@@ -57,24 +57,36 @@ func (s *Server) listAnnotations(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		if color != "" {
 			query = query.Joins("JOIN highlights ON highlights.id = notes.highlight_id").Where("highlights.color = ?", color)
 		}
-		var notes []models.Note
-		if err := query.Order("notes.created_at desc").Find(&notes).Error; err != nil {
+		offset, limit := pagination(r)
+		var total int64
+		if err := query.Model(&models.Note{}).Count(&total).Error; err != nil {
 			internalError(w, err)
 			return
 		}
-		respond(w, 200, map[string]interface{}{"type": "note", "items": notes})
+		var notes []models.Note
+		if err := query.Order("notes.created_at desc").Offset(offset).Limit(limit).Find(&notes).Error; err != nil {
+			internalError(w, err)
+			return
+		}
+		respond(w, 200, map[string]interface{}{"type": "note", "items": notes, "offset": offset, "limit": limit, "total": total})
 		return
 	}
 	query := s.db.Where("user_id = ? AND book_id = ?", user.ID, book.ID)
 	if color != "" {
 		query = query.Where("color = ?", color)
 	}
-	var highlights []models.Highlight
-	if err := query.Preload("Notes", "user_id = ?", user.ID).Order("created_at desc").Find(&highlights).Error; err != nil {
+	offset, limit := pagination(r)
+	var total int64
+	if err := query.Model(&models.Highlight{}).Count(&total).Error; err != nil {
 		internalError(w, err)
 		return
 	}
-	respond(w, 200, map[string]interface{}{"type": "highlight", "items": highlights})
+	var highlights []models.Highlight
+	if err := query.Preload("Note", "user_id = ?", user.ID).Order("created_at desc").Offset(offset).Limit(limit).Find(&highlights).Error; err != nil {
+		internalError(w, err)
+		return
+	}
+	respond(w, 200, map[string]interface{}{"type": "highlight", "items": highlights, "offset": offset, "limit": limit, "total": total})
 }
 func (s *Server) createHighlight(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	book, ok := s.findBook(w, chi.URLParam(r, "bookID"))
@@ -156,12 +168,22 @@ func (s *Server) createNote(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		fail(w, 400, err.Error())
 		return
 	}
-	note := models.Note{UserID: currentUser(r).ID, BookID: highlight.BookID, HighlightID: highlight.ID, Content: strings.TrimSpace(input.Content)}
-	if err := s.db.Create(&note).Error; err != nil {
+	note := models.Note{UserID: currentUser(r).ID, BookID: highlight.BookID, HighlightID: highlight.ID}
+	result := s.db.Where("highlight_id = ? AND user_id = ?", highlight.ID, currentUser(r).ID).FirstOrCreate(&note)
+	if result.Error != nil {
+		internalError(w, result.Error)
+		return
+	}
+	note.Content = strings.TrimSpace(input.Content)
+	if err := s.db.Save(&note).Error; err != nil {
 		internalError(w, err)
 		return
 	}
-	respond(w, 201, note)
+	status := 200
+	if result.RowsAffected > 0 {
+		status = 201
+	}
+	respond(w, status, note)
 }
 func (s *Server) updateNote(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	note, ok := s.findOwnedNote(w, r)

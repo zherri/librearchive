@@ -25,13 +25,9 @@ func (input catalogNameInput) validate(maxLength int) error {
 	return nil
 }
 
-func (s *Server) listCategories(w stdhttp.ResponseWriter, _ *stdhttp.Request) {
+func (s *Server) listCategories(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	var categories []models.Category
-	if err := s.db.Order("name").Find(&categories).Error; err != nil {
-		internalError(w, err)
-		return
-	}
-	respond(w, 200, categories)
+	paginated(w, r, s.db.Order("name"), &categories)
 }
 func (s *Server) createCategory(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	var input catalogNameInput
@@ -85,13 +81,9 @@ func (s *Server) deleteCategory(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	}
 	w.WriteHeader(204)
 }
-func (s *Server) listTags(w stdhttp.ResponseWriter, _ *stdhttp.Request) {
+func (s *Server) listTags(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	var tags []models.Tag
-	if err := s.db.Order("name").Find(&tags).Error; err != nil {
-		internalError(w, err)
-		return
-	}
-	respond(w, 200, tags)
+	paginated(w, r, s.db.Order("name"), &tags)
 }
 func (s *Server) createTag(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	var input catalogNameInput

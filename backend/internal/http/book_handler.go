@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	pdfapi "github.com/pdfcpu/pdfcpu/pkg/api"
 	"gorm.io/gorm"
 
 	"github.com/librearchive/librearchive/internal/models"
@@ -19,7 +20,7 @@ func (s *Server) listBooks(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	query := s.db.Model(&models.Book{})
 	if search := strings.TrimSpace(r.URL.Query().Get("search")); search != "" {
 		term := "%" + strings.ToLower(search) + "%"
-		query = query.Where("LOWER(title) LIKE ? OR LOWER(author) LIKE ?", term, term)
+		query = query.Where("LOWER(title) LIKE ? OR LOWER(authors) LIKE ?", term, term)
 	}
 	if categoryID := strings.TrimSpace(r.URL.Query().Get("categoryId")); categoryID != "" {
 		query = query.Joins("JOIN book_categories ON book_categories.book_id = books.id").Where("book_categories.category_id = ?", categoryID)
@@ -27,18 +28,18 @@ func (s *Server) listBooks(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	if tagID := strings.TrimSpace(r.URL.Query().Get("tagId")); tagID != "" {
 		query = query.Joins("JOIN book_tags ON book_tags.book_id = books.id").Where("book_tags.tag_id = ?", tagID)
 	}
-	page, size := pagination(r)
+	offset, limit := pagination(r)
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		internalError(w, err)
 		return
 	}
 	var books []models.Book
-	if err := query.Order("created_at desc").Offset((page - 1) * size).Limit(size).Find(&books).Error; err != nil {
+	if err := query.Order("created_at desc").Offset(offset).Limit(limit).Find(&books).Error; err != nil {
 		internalError(w, err)
 		return
 	}
-	respond(w, 200, map[string]interface{}{"items": books, "page": page, "pageSize": size, "total": total})
+	respond(w, 200, map[string]interface{}{"items": books, "offset": offset, "limit": limit, "total": total})
 }
 func (s *Server) getBook(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	book, ok := s.findBook(w, chi.URLParam(r, "bookID"))
@@ -52,9 +53,9 @@ func (s *Server) createBook(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		fail(w, 400, "invalid multipart upload or file exceeds the configured limit")
 		return
 	}
-	title, author := strings.TrimSpace(r.FormValue("title")), strings.TrimSpace(r.FormValue("author"))
-	if title == "" || author == "" {
-		fail(w, 400, "title and author are required")
+	title, authors := strings.TrimSpace(r.FormValue("title")), strings.TrimSpace(r.FormValue("authors"))
+	if title == "" || authors == "" {
+		fail(w, 400, "title and authors are required")
 		return
 	}
 	pdf, header, err := r.FormFile("file")
@@ -88,20 +89,19 @@ func (s *Server) createBook(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		internalError(w, err)
 		return
 	}
-	book := models.Book{Title: title, Author: author, Description: strings.TrimSpace(r.FormValue("description")), Language: strings.TrimSpace(r.FormValue("language")), StoredFilename: stored, OriginalName: header.Filename, UploadedByID: currentUser(r).ID}
+	pageCount, err := pdfapi.PageCountFile(bookPath)
+	if err != nil || pageCount < 1 {
+		_ = os.Remove(bookPath)
+		fail(w, 400, "book file must be a readable PDF")
+		return
+	}
+	book := models.Book{Title: title, Authors: authors, Description: strings.TrimSpace(r.FormValue("description")), Publisher: strings.TrimSpace(r.FormValue("publisher")), StoredFilename: stored, OriginalName: header.Filename, PageCount: &pageCount}
 	if year, err := optionalPositiveInt(r.FormValue("publishedYear")); err != nil {
 		_ = os.Remove(bookPath)
 		fail(w, 400, "publishedYear must be a positive integer")
 		return
 	} else {
 		book.PublishedYear = year
-	}
-	if pages, err := optionalPositiveInt(r.FormValue("pageCount")); err != nil {
-		_ = os.Remove(bookPath)
-		fail(w, 400, "pageCount must be a positive integer")
-		return
-	} else {
-		book.PageCount = pages
 	}
 	if cover, coverHeader, err := r.FormFile("cover"); err == nil {
 		defer cover.Close()
@@ -155,11 +155,10 @@ func isAllowedCoverMediaType(mediaType string) bool {
 
 type updateBookInput struct {
 	Title         *string `json:"title"`
-	Author        *string `json:"author"`
+	Authors       *string `json:"authors"`
 	Description   *string `json:"description"`
-	Language      *string `json:"language"`
+	Publisher     *string `json:"publisher"`
 	PublishedYear *int    `json:"publishedYear"`
-	PageCount     *int    `json:"pageCount"`
 }
 
 func (s *Server) updateBook(w stdhttp.ResponseWriter, r *stdhttp.Request) {
@@ -178,18 +177,18 @@ func (s *Server) updateBook(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		}
 		book.Title = strings.TrimSpace(*input.Title)
 	}
-	if input.Author != nil {
-		if strings.TrimSpace(*input.Author) == "" {
-			fail(w, 400, "author cannot be empty")
+	if input.Authors != nil {
+		if strings.TrimSpace(*input.Authors) == "" {
+			fail(w, 400, "authors cannot be empty")
 			return
 		}
-		book.Author = strings.TrimSpace(*input.Author)
+		book.Authors = strings.TrimSpace(*input.Authors)
 	}
 	if input.Description != nil {
 		book.Description = strings.TrimSpace(*input.Description)
 	}
-	if input.Language != nil {
-		book.Language = strings.TrimSpace(*input.Language)
+	if input.Publisher != nil {
+		book.Publisher = strings.TrimSpace(*input.Publisher)
 	}
 	if input.PublishedYear != nil {
 		if *input.PublishedYear < 1 {
@@ -197,13 +196,6 @@ func (s *Server) updateBook(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 			return
 		}
 		book.PublishedYear = input.PublishedYear
-	}
-	if input.PageCount != nil {
-		if *input.PageCount < 1 {
-			fail(w, 400, "pageCount must be positive")
-			return
-		}
-		book.PageCount = input.PageCount
 	}
 	if err := s.db.Save(&book).Error; err != nil {
 		internalError(w, err)

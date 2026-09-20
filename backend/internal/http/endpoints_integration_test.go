@@ -12,16 +12,21 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/librearchive/librearchive/internal/bootstrap"
 	"github.com/librearchive/librearchive/internal/config"
 	"github.com/librearchive/librearchive/internal/database"
 	api "github.com/librearchive/librearchive/internal/http"
+	pdfapi "github.com/pdfcpu/pdfcpu/pkg/api"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 )
 
 type apiFixture struct {
-	t                                                                               *testing.T
-	handler                                                                         http.Handler
-	adminToken, readerToken                                                         string
-	adminID, readerID, bookID, categoryID, tagID, collectionID, highlightID, noteID uint
+	t                                                                      *testing.T
+	handler                                                                http.Handler
+	adminToken, readerToken                                                string
+	readerID, bookID, categoryID, tagID, collectionID, highlightID, noteID uint
 }
 
 func TestAllAPIEndpoints(t *testing.T) {
@@ -30,7 +35,8 @@ func TestAllAPIEndpoints(t *testing.T) {
 	f.expect(http.MethodGet, "/ready", nil, "", http.StatusOK, nil)
 
 	// Administrator user management, including reader authorization denial.
-	f.expect(http.MethodGet, "/api/v1/users", nil, f.adminToken, http.StatusOK, nil)
+	users := f.expect(http.MethodGet, "/api/v1/users?offset=0&limit=1", nil, f.adminToken, http.StatusOK, nil)
+	assertPagination(t, users, 0, 1)
 	createdReader := f.expect(http.MethodPost, "/api/v1/users", map[string]string{"username": "reader", "name": "Reader"}, f.adminToken, http.StatusCreated, nil)
 	f.readerID = nestedUint(t, createdReader, "user", "id")
 	readerPassphrase := nestedString(t, createdReader, "passphrase")
@@ -117,22 +123,61 @@ func newFixture(t *testing.T) *apiFixture {
 		t.Fatal(err)
 	}
 	f := &apiFixture{t: t, handler: server.Router()}
-	bootstrap := f.expect(http.MethodPost, "/api/v1/auth/bootstrap", map[string]string{"username": "admin", "name": "Administrator"}, "", http.StatusCreated, nil)
-	f.adminID = nestedUint(t, bootstrap, "user", "id")
-	f.adminToken = f.login("admin", nestedString(t, bootstrap, "passphrase"))
+	initialAdministrator, err := bootstrap.EnsureInitialAdministrator(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.adminToken = f.login(initialAdministrator.Username, initialAdministrator.Passphrase)
 	return f
 }
 func (f *apiFixture) login(username, phrase string) string {
 	response := f.expect(http.MethodPost, "/api/v1/auth/login", map[string]string{"username": username, "passphrase": phrase}, "", http.StatusOK, nil)
 	return nestedString(f.t, response, "token")
 }
+
+func assertPagination(t *testing.T, response map[string]interface{}, offset, limit int) {
+	t.Helper()
+	if _, ok := response["items"].([]interface{}); !ok {
+		t.Fatalf("paginated response is missing items: %#v", response)
+	}
+	if got := int(response["offset"].(float64)); got != offset {
+		t.Fatalf("offset=%d want=%d", got, offset)
+	}
+	if got := int(response["limit"].(float64)); got != limit {
+		t.Fatalf("limit=%d want=%d", got, limit)
+	}
+	if _, ok := response["total"].(float64); !ok {
+		t.Fatalf("paginated response is missing total: %#v", response)
+	}
+}
 func (f *apiFixture) createBook() uint {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	_ = writer.WriteField("title", "Test Book")
-	_ = writer.WriteField("author", "Test Author")
+	_ = writer.WriteField("authors", "Test Author")
 	pdf, _ := writer.CreateFormFile("file", "book.pdf")
-	_, _ = pdf.Write([]byte("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF"))
+	pdfPath := filepath.Join(f.t.TempDir(), "book.pdf")
+	xref, err := pdfcpu.CreateDemoXRef()
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	page := model.Page{MediaBox: types.RectForFormat("A4"), Fm: model.FontMap{}, Buf: new(bytes.Buffer)}
+	pdfcpu.CreateTestPageContent(page)
+	root, err := xref.Catalog()
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	if err := pdfcpu.AddPageTreeWithSamplePage(xref, root, page); err != nil {
+		f.t.Fatal(err)
+	}
+	if err := pdfapi.CreatePDFFile(xref, pdfPath, nil); err != nil {
+		f.t.Fatal(err)
+	}
+	pdfBytes, err := os.ReadFile(pdfPath)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	_, _ = pdf.Write(pdfBytes)
 	cover, _ := writer.CreateFormFile("cover", "cover.png")
 	_, _ = cover.Write([]byte{137, 80, 78, 71, 13, 10, 26, 10})
 	_ = writer.Close()

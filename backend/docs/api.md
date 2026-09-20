@@ -2,9 +2,10 @@
 
 All protected endpoints require `Authorization: Bearer <access-token>`. Responses and request bodies use JSON unless an endpoint is explicitly described as multipart.
 
+Every collection endpoint is offset-paginated. Use optional `offset` (default `0`) and `limit` (default `20`, maximum `100`) parameters. The response shape is `{ "items": [...], "offset": 0, "limit": 20, "total": 42 }`. This applies to books, reading progress, favorites, collections, collection books, annotations, users, categories, and tags. The previous `page` and `pageSize` parameters remain accepted temporarily for compatibility.
+
 ## Authentication and account
 
-- `POST /api/v1/auth/bootstrap` creates the first administrator and only succeeds while no user exists. It accepts `username` and `name`, then returns a one-time generated twelve-word `passphrase`.
 - `POST /api/v1/auth/login` accepts `username` and `passphrase`, then returns an access token and the authenticated user.
 - `POST /api/v1/auth/refresh` accepts `{ "refreshToken": "..." }` and rotates it, returning a new access token and refresh token.
 - `POST /api/v1/auth/logout` revokes the current authenticated session.
@@ -32,7 +33,7 @@ Reading-progress writes accept `status`, `currentPage`, `progressPercent`, and `
 - `GET`, `POST /api/v1/users`
 - `PATCH`, `DELETE /api/v1/users/{userID}`
 - `POST /api/v1/users/{userID}/reset-passphrase` generates and returns a replacement twelve-word passphrase once.
-- `POST /api/v1/books` accepts multipart fields `title`, `author`, PDF `file`, and optional `description`, `language`, `publishedYear`, `pageCount`, and image `cover`.
+- `POST /api/v1/books` accepts multipart fields `title`, `authors`, PDF `file`, and optional `description`, `publisher`, `publishedYear`, and image `cover`. The API derives `pageCount` from the PDF.
 - `PATCH`, `DELETE /api/v1/books/{bookID}`
 - `GET /api/v1/categories`, `GET /api/v1/tags` are available to authenticated readers.
 - `POST /api/v1/categories`, `PATCH`, `DELETE /api/v1/categories/{categoryID}` manage categories; the equivalent tag routes use `/api/v1/tags` and `/api/v1/tags/{tagID}`.

@@ -52,10 +52,11 @@ The system must support a complete administrator-managed CRUD lifecycle for book
 
 - Add a book by uploading a PDF file.
 - Store and serve a book cover image.
-- Create and update book metadata, including at least title, author, description, publication information, language, categories or tags, and cover reference.
+- Create and update book metadata, including title, description, one or more authors, publisher, publication year, categories or tags, and cover reference. Language is not part of the book model.
+- Require an administrator to submit the PDF, metadata, and an optional cover image together through the mobile administration workflow. The API must calculate and persist `pageCount` from the uploaded PDF; clients must not submit or edit it.
 - Remove a book and its associated managed assets according to a safe deletion policy.
 - List books available to a reader with pagination.
-- Search the catalog by relevant metadata, at minimum title and author.
+- Search the catalog by relevant metadata, at minimum title and authors.
 
 PDF is the required book format for the first version. The data model should allow additional formats in a future version, but no other reader format is required now.
 
@@ -101,7 +102,7 @@ Collections and favorite flags are personal; one reader’s organization must no
 The API must provide administrator-only user management, including:
 
 - Administrator-created user accounts. Public self-registration is not required.
-- Authentication with a unique username and an automatically generated twelve-word passphrase. Email addresses, email verification, and email-based account recovery are intentionally out of scope.
+- Authentication with a unique username and an automatically generated twelve-word passphrase. On the first API start with no administrator in the database, the backend must create an active administrator named `admin` with username `admin` and display its generated passphrase once in the server console. Email addresses, email verification, and email-based account recovery are intentionally out of scope.
 - The generated passphrase must be shown only once at account creation or administrator-initiated reset. Only a bcrypt hash of the passphrase may be stored in the database.
 - Secure session/token handling.
 - User profile updates where permitted.
@@ -166,7 +167,7 @@ Container-based deployment may be provided, but the application should not depen
 
 ## 8. Security and Data Ownership Baseline
 
-- Generated passphrases must be hashed with bcrypt; they must never be stored in plain text.
+- Generated passphrases must be hashed with bcrypt; they must never be stored in plain text. The initial administrator passphrase may be displayed once to the server operator during first-start provisioning, but must not be written by application logging thereafter.
 - Protected endpoints must require authentication.
 - Authorization must be checked for every resource access, especially personal reading data and administrator operations.
 - File uploads must validate file type, size, and ownership before being stored or served.
@@ -193,14 +194,15 @@ The first backend milestone provides the functional domain API. Before declaring
 
 - Publish an OpenAPI specification for every supported endpoint, request body, response body, authentication requirement, and error response.
 - Provide runnable request examples for administrator and reader workflows.
-- Apply consistent pagination, filtering, sorting, and error-response conventions to every collection endpoint.
+- Apply consistent pagination, filtering, sorting, and error-response conventions to every collection endpoint. Collection requests use offset pagination with `offset` (default `0`) and `limit` (default `20`, maximum `100`); responses use `{ "items": [...], "offset": 0, "limit": 20, "total": 0 }`. The mobile client must refresh from offset zero and offer progressive loading whenever `offset + limit < total`.
 - Document API versioning and compatibility expectations.
 
 ### Authentication and Account Security
 
 - Implement access-token renewal and secure token revocation, including logout from an individual device and all devices where applicable.
 - Use usernames and automatically generated twelve-word passphrases; do not collect, require, verify, or use email addresses.
-- Normalize a passphrase and pre-hash it with SHA-256 before bcrypt to avoid bcrypt's 72-byte input limit; never log or persist a generated passphrase in plain text.
+- Use role-based mobile refresh-token lifetimes: access tokens expire after one day for every role; administrator refresh tokens expire after one day, while reader refresh tokens expire after 365 days to support low-friction household reading devices. Both tokens must be signed JWTs and refresh tokens must rotate on use. Passphrase resets, deactivation, deletion, and logout must revoke active sessions.
+- Normalize a passphrase and pre-hash it with SHA-256 before bcrypt to avoid bcrypt's 72-byte input limit; never persist a generated passphrase in plain text. The backend displays the initial administrator passphrase once in the first-start server console output; it must not emit it in normal application logs.
 - Provide an administrator-initiated passphrase reset that generates a new twelve-word passphrase and returns it once to the administrator for secure delivery to the reader.
 - Prevent an administrator from accidentally removing or deactivating the final active administrator account.
 - Record security-relevant account events without exposing passphrases, tokens, or private book content.

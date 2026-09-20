@@ -100,16 +100,16 @@ func (s *Server) listReadingProgress(w stdhttp.ResponseWriter, r *stdhttp.Reques
 		}
 		query = query.Where("is_downloaded = ?", downloaded == "true")
 	}
-	page, size := pagination(r)
+	offset, limit := pagination(r)
 	var total int64
 	if err := query.Model(&models.ReadingProgress{}).Count(&total).Error; err != nil {
 		internalError(w, err)
 		return
 	}
 	var progress []models.ReadingProgress
-	if err := query.Preload("Book").Order("last_read_at desc").Offset((page - 1) * size).Limit(size).Find(&progress).Error; err != nil {
+	if err := query.Preload("Book").Order("last_read_at desc").Offset(offset).Limit(limit).Find(&progress).Error; err != nil {
 		internalError(w, err)
 		return
 	}
-	respond(w, 200, map[string]interface{}{"items": progress, "page": page, "pageSize": size, "total": total})
+	respond(w, 200, map[string]interface{}{"items": progress, "offset": offset, "limit": limit, "total": total})
 }

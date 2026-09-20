@@ -14,5 +14,5 @@ type Highlight struct {
 	ChapterRef   string    `gorm:"size:255" json:"chapterRef,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
-	Notes        []Note    `json:"notes,omitempty"`
+	Note         *Note     `gorm:"foreignKey:HighlightID" json:"note,omitempty"`
 }

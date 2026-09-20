@@ -36,7 +36,6 @@ func (s *Server) Router() stdhttp.Handler {
 	router.Get("/health", s.health)
 	router.Get("/ready", s.ready)
 	router.Route("/api/v1", func(router chi.Router) {
-		router.With(s.limitAuthentication).Post("/auth/bootstrap", s.bootstrap)
 		router.With(s.limitAuthentication).Post("/auth/login", s.login)
 		router.With(s.limitAuthentication).Post("/auth/refresh", s.refresh)
 		router.Group(func(router chi.Router) {

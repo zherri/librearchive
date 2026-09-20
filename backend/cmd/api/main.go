@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/librearchive/librearchive/internal/bootstrap"
 	"github.com/librearchive/librearchive/internal/config"
 	"github.com/librearchive/librearchive/internal/database"
 	api "github.com/librearchive/librearchive/internal/http"
@@ -24,6 +26,13 @@ func main() {
 	db, err := database.Open(cfg.DatabasePath)
 	if err != nil {
 		log.Fatalf("open database: %v", err)
+	}
+	initialAdministrator, err := bootstrap.EnsureInitialAdministrator(db)
+	if err != nil {
+		log.Fatalf("initialize administrator: %v", err)
+	}
+	if initialAdministrator.Created {
+		fmt.Fprintf(os.Stderr, "\nLibreArchive Initial Administrator Created\nUsername: %s\nPassphrase (shown once): %s\nStore this passphrase securely before continuing.\n\n", initialAdministrator.Username, initialAdministrator.Passphrase)
 	}
 
 	server, err := api.NewServer(cfg, db)

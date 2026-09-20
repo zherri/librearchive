@@ -17,6 +17,11 @@ type claims struct {
 	SessionID uint        `json:"sid"`
 	jwt.RegisteredClaims
 }
+
+type refreshClaims struct {
+	SessionID uint `json:"sid"`
+	jwt.RegisteredClaims
+}
 type userContextKey struct{}
 
 func (s *Server) authenticate(next stdhttp.Handler) stdhttp.Handler {
@@ -70,5 +75,11 @@ func currentUser(r *stdhttp.Request) models.User {
 	return user
 }
 func (s *Server) tokenFor(user models.User, sessionID uint) (string, error) {
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims{Role: user.Role, SessionID: sessionID, RegisteredClaims: jwt.RegisteredClaims{Subject: strconv.FormatUint(uint64(user.ID), 10), ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)), IssuedAt: jwt.NewNumericDate(time.Now())}}).SignedString([]byte(s.config.JWTSecret))
+	now := time.Now()
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims{Role: user.Role, SessionID: sessionID, RegisteredClaims: jwt.RegisteredClaims{Subject: strconv.FormatUint(uint64(user.ID), 10), ExpiresAt: jwt.NewNumericDate(now.Add(24 * time.Hour)), IssuedAt: jwt.NewNumericDate(now)}}).SignedString([]byte(s.config.JWTSecret))
+}
+
+func (s *Server) refreshTokenFor(user models.User, sessionID uint, expiresAt time.Time) (string, error) {
+	now := time.Now()
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims{SessionID: sessionID, RegisteredClaims: jwt.RegisteredClaims{Subject: strconv.FormatUint(uint64(user.ID), 10), ExpiresAt: jwt.NewNumericDate(expiresAt), IssuedAt: jwt.NewNumericDate(now)}}).SignedString([]byte(s.config.JWTSecret))
 }
